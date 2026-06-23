@@ -5,11 +5,9 @@ dotenv.config();
 
 const db = async () => {
     try {
-        // Connect to MongoDB using the direct URI!
         await mongoose.connect(process.env.MONGO_URI);
         console.log("MongoDB Database connected successfully!");
 
-        // Connect to Redis
         const redisClient = createClient({
             url: process.env.REDIS_URI
         });
