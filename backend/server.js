@@ -18,8 +18,11 @@ server.post("/jobs", async (req, res) => {
         id: jobId,
         command: command,
         data: JSON.stringify(data),
-        status: 'pending'
+        status: 'pending',
+        attempts: 0,
+        maxRetries: 3
     })
+
     await redisClient.lPush('queue', jobId);
     return res.status(201).json({ jobId, message: "Job added to queue" });
 })
@@ -32,6 +35,11 @@ server.get("/jobs/:id", async (req, res) => {
         return res.status(404).json({ message: "Job not found" });
     }
     return res.status(200).json(job);
+})
+
+server.get("/dlq", async (req, res) => {
+    const dlqJobs = await redisClient.lRange("dlq", 0, -1);
+    return res.status(200).json(dlqJobs);
 })
 
 

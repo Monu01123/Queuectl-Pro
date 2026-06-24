@@ -8,42 +8,54 @@ const startWorker = async () => {
     const redisClient = await db();
 
     while (true) {
+        let jobId = null;
+
         try {
             console.log("Waiting for jobs...");
-
             const result = await redisClient.brPop("queue", 0);
-
             if (!result) continue;
 
-            const jobId = result.element;
-
+            jobId = result.element;
             console.log(`Processing job ${jobId}`);
 
-            await redisClient.hSet(`job:${jobId}`, {
-                status: "processing",
-            });
 
             const job = await redisClient.hGetAll(`job:${jobId}`);
-
             if (!job || Object.keys(job).length === 0) {
-                console.log(`Job ${jobId} not found`);
                 continue;
             }
 
-            const { command, data } = job;
 
-            console.log(`Executing command: ${command}`);
-            console.log(`Data: ${data}`);
+            // throw new Error("Simulated random API failure!");
 
-            await sleep(5000);
 
-            await redisClient.hSet(`job:${jobId}`, {
-                status: "completed",
-            });
+            await sleep(2000);
 
+            await redisClient.hSet(`job:${jobId}`, { status: "completed" });
             console.log(`Job ${jobId} completed`);
+
         } catch (error) {
-            console.error("Worker Error:", error);
+            console.error(`Worker Error on Job ${jobId}:`, error.message);
+
+            if (jobId) {
+                const job = await redisClient.hGetAll(`job:${jobId}`);
+
+                const currentAttempts = parseInt(job.attempts || 0) + 1;
+                const maxRetries = parseInt(job.maxRetries || 3);
+
+                if (currentAttempts <= maxRetries) {
+                    await redisClient.hSet(`job:${jobId}`, {
+                        attempts: currentAttempts,
+                        status: "pending"
+                    });
+                    await redisClient.lPush("queue", jobId);
+                    console.log(`Job ${jobId} failed. Retrying... (${currentAttempts}/${maxRetries})`);
+                } else {
+                    await redisClient.hSet(`job:${jobId}`, { status: "failed" });
+                    console.log(`Job ${jobId} failed permanently after ${maxRetries} retries`);
+                    await redisClient.lPush("dlq", jobId);
+                    console.log(`Job ${jobId} added to dead Letter Queue`);
+                }
+            }
         }
     }
 };
