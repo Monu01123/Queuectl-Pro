@@ -1,11 +1,12 @@
 import express, { json } from 'express';
 import db from './config/db.js'
-
+import cors from 'cors';
 
 const server = express();
 const PORT = 3000;
 
 server.use(express.json());
+server.use(cors());
 const redisClient = await db();
 
 server.post("/jobs", async (req, res) => {
@@ -49,6 +50,21 @@ server.get("/dlq", async (req, res) => {
     const dlqJobs = await redisClient.lRange("dlq", 0, -1);
     return res.status(200).json(dlqJobs);
 })
+
+server.get("/stats", async (req, res) => {
+    try {
+        const queueLength = await redisClient.lLen("queue");
+        const dlqLength = await redisClient.lLen("dlq");
+        const delayedLength = await redisClient.zCard("delayed");
+        return res.status(200).json({
+            queue: queueLength,
+            dlq: dlqLength,
+            delayed: delayedLength
+        });
+    } catch (error) {
+        return res.status(500).json({ message: "Error fetching stats" });
+    }
+});
 
 
 server.listen(PORT, () => {
