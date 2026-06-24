@@ -24,7 +24,7 @@ const startWorker = async () => {
                 continue;
             }
 
-
+            // for testing DLQ purpose 
             // throw new Error("Simulated random API failure!");
 
 

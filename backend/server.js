@@ -9,21 +9,29 @@ server.use(express.json());
 const redisClient = await db();
 
 server.post("/jobs", async (req, res) => {
-    const { command, data } = req.body;
+    const { command, data, delay } = req.body;
     if (!command || !data) {
         return res.status(400).json({ message: "Command and data are required" });
     }
-    const jobId = Date.now().toString();
-    await redisClient.hSet(`job:${jobId}`, {
-        id: jobId,
-        command: command,
-        data: JSON.stringify(data),
-        status: 'pending',
-        attempts: 0,
-        maxRetries: 3
-    })
 
-    await redisClient.lPush('queue', jobId);
+    const jobId = Date.now().toString();
+
+    if (delay) {
+        const executedAt = Date.now() + (delay * 1000);
+        await redisClient.hSet(`job:${jobId}`, { status: 'delayed' });
+        await redisClient.zAdd('delayed', { score: executedAt, value: jobId });
+    }
+    else {
+        await redisClient.hSet(`job:${jobId}`, {
+            id: jobId,
+            command: command,
+            data: JSON.stringify(data),
+            status: 'pending',
+            attempts: 0,
+            maxRetries: 3
+        })
+        await redisClient.lPush('queue', jobId);
+    }
     return res.status(201).json({ jobId, message: "Job added to queue" });
 })
 
