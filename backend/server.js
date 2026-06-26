@@ -10,7 +10,7 @@ server.use(cors());
 const redisClient = await db();
 
 server.post("/jobs", async (req, res) => {
-    const { command, data, delay } = req.body;
+    const { command, data, delay, priority = 'normal' } = req.body;
     if (!command || !data) {
         return res.status(400).json({ message: "Command and data are required" });
     }
@@ -29,9 +29,10 @@ server.post("/jobs", async (req, res) => {
             data: JSON.stringify(data),
             status: 'pending',
             attempts: 0,
-            maxRetries: 3
+            maxRetries: 3,
+            priority: priority
         })
-        await redisClient.lPush('queue', jobId);
+        await redisClient.lPush(`queue:${priority}`, jobId);
     }
     return res.status(201).json({ jobId, message: "Job added to queue" });
 })
@@ -53,11 +54,16 @@ server.get("/dlq", async (req, res) => {
 
 server.get("/stats", async (req, res) => {
     try {
-        const queueLength = await redisClient.lLen("queue");
+        const highLen = await redisClient.lLen("queue:high");
+        const normalLen = await redisClient.lLen("queue:normal");
+        const lowLen = await redisClient.lLen("queue:low");
+        const oldLen = await redisClient.lLen("queue"); // fallback for old jobs
+
         const dlqLength = await redisClient.lLen("dlq");
         const delayedLength = await redisClient.zCard("delayed");
+
         return res.status(200).json({
-            queue: queueLength,
+            queue: highLen + normalLen + lowLen + oldLen,
             dlq: dlqLength,
             delayed: delayedLength
         });
@@ -65,6 +71,7 @@ server.get("/stats", async (req, res) => {
         return res.status(500).json({ message: "Error fetching stats" });
     }
 });
+
 
 
 server.listen(PORT, () => {

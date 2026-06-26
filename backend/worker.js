@@ -12,7 +12,11 @@ const startWorker = async () => {
 
         try {
             console.log("Waiting for jobs...");
-            const result = await redisClient.brPop("queue", 0);
+            const result = await redisClient.brPop(
+                ['queue:high', 'queue:normal', 'queue:low', 'queue'],
+                0
+            );
+
             if (!result) continue;
 
             jobId = result.element;
@@ -26,9 +30,7 @@ const startWorker = async () => {
 
             // for testing DLQ purpose 
             // throw new Error("Simulated random API failure!");
-
-
-            await sleep(2000);
+            // await sleep(2000);
 
             await redisClient.hSet(`job:${jobId}`, { status: "completed" });
             console.log(`Job ${jobId} completed`);
@@ -43,12 +45,16 @@ const startWorker = async () => {
                 const maxRetries = parseInt(job.maxRetries || 3);
 
                 if (currentAttempts <= maxRetries) {
+
+                    const delaySeconds = Math.pow(2, currentAttempts);
+                    const retryTimestamp = Date.now() + (delaySeconds * 1000);
+
                     await redisClient.hSet(`job:${jobId}`, {
                         attempts: currentAttempts,
-                        status: "pending"
+                        status: "delayed"
                     });
-                    await redisClient.lPush("queue", jobId);
-                    console.log(`Job ${jobId} failed. Retrying... (${currentAttempts}/${maxRetries})`);
+                    await redisClient.zAdd('delayed', { score: retryTimestamp, value: jobId });
+                    console.log(`Job ${jobId} failed. Retry delay ${delaySeconds} seconds (${currentAttempts}/${maxRetries})`);
                 } else {
                     await redisClient.hSet(`job:${jobId}`, { status: "failed" });
                     console.log(`Job ${jobId} failed permanently after ${maxRetries} retries`);

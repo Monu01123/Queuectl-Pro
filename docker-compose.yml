@@ -1,0 +1,42 @@
+services:
+  # HTTP Express API Gateway
+  api:
+    build: ./backend
+    container_name: queuectl-api
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./backend/.env
+    restart: always
+
+  # Background Job Scheduler
+  scheduler:
+    build: ./backend
+    container_name: queuectl-scheduler
+    command: ["node", "scheduler.js"]
+    env_file:
+      - ./backend/.env
+    restart: always
+    depends_on:
+      - api
+
+  # Multi-Core Worker Cluster
+  workers:
+    build: ./backend
+    container_name: queuectl-workers
+    command: ["node", "cluster.js"]
+    env_file:
+      - ./backend/.env
+    restart: always
+    depends_on:
+      - api
+
+  # React Web Dashboard
+  dashboard:
+    build: ./frontend
+    container_name: queuectl-dashboard
+    ports:
+      - "80:80"
+    restart: always
+    depends_on:
+      - api

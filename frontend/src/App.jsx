@@ -7,8 +7,10 @@ function App() {
   const [form, setForm] = useState({
     command: 'send-email',
     data: '{"user": "monu_mca"}',
-    delay: 5
+    delay: 0,
+    priority: 'normal'
   });
+
 
   useEffect(() => {
     // 1. Create a function called fetchStats that makes a GET request to http://localhost:3000/stats
@@ -40,7 +42,8 @@ function App() {
         body: JSON.stringify({
           command: form.command,
           data: JSON.parse(form.data || '{}'),
-          delay: Number(form.delay) > 0 ? Number(form.delay) : undefined
+          delay: Number(form.delay) > 0 ? Number(form.delay) : undefined,
+          priority: form.priority
         })
       });
     } catch (err) {
@@ -101,6 +104,19 @@ function App() {
                 onChange={e => setForm({ ...form, delay: e.target.value })}
               />
             </div>
+            <div className="form-group">
+              <label>Priority Level</label>
+              <select
+                className="form-input"
+                value={form.priority}
+                onChange={e => setForm({ ...form, priority: e.target.value })}
+              >
+                <option value="high">🔴 High (VIP)</option>
+                <option value="normal">🔵 Normal</option>
+                <option value="low">🟢 Low</option>
+              </select>
+            </div>
+
           </div>
           <button type="submit" className="submit-btn">
             + Enqueue Job
