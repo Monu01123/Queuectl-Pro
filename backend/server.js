@@ -10,28 +10,30 @@ server.use(cors());
 const redisClient = await db();
 
 server.post("/jobs", async (req, res) => {
-    const { command, data, delay, priority = 'normal' } = req.body;
+    const { command, data, delay, priority = 'normal', callbackUrl } = req.body;
     if (!command || !data) {
         return res.status(400).json({ message: "Command and data are required" });
     }
 
     const jobId = Date.now().toString();
+    const jobPayload = {
+        id: jobId,
+        command: command,
+        data: JSON.stringify(data),
+        status: delay ? 'delayed' : 'pending',
+        attempts: 0,
+        maxRetries: 3,
+        priority: priority,
+        callbackUrl: callbackUrl || ''
+    };
+
+    await redisClient.hSet(`job:${jobId}`, jobPayload);
 
     if (delay) {
         const executedAt = Date.now() + (delay * 1000);
-        await redisClient.hSet(`job:${jobId}`, { status: 'delayed' });
         await redisClient.zAdd('delayed', { score: executedAt, value: jobId });
     }
     else {
-        await redisClient.hSet(`job:${jobId}`, {
-            id: jobId,
-            command: command,
-            data: JSON.stringify(data),
-            status: 'pending',
-            attempts: 0,
-            maxRetries: 3,
-            priority: priority
-        })
         await redisClient.lPush(`queue:${priority}`, jobId);
     }
     return res.status(201).json({ jobId, message: "Job added to queue" });

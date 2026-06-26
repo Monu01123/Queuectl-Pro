@@ -8,7 +8,8 @@ function App() {
     command: 'send-email',
     data: '{"user": "monu_mca"}',
     delay: 0,
-    priority: 'normal'
+    priority: 'normal',
+    callbackUrl: ''
   });
 
 
@@ -43,7 +44,8 @@ function App() {
           command: form.command,
           data: JSON.parse(form.data || '{}'),
           delay: Number(form.delay) > 0 ? Number(form.delay) : undefined,
-          priority: form.priority
+          priority: form.priority,
+          callbackUrl: form.callbackUrl || undefined
         })
       });
     } catch (err) {
@@ -115,6 +117,15 @@ function App() {
                 <option value="normal">🔵 Normal</option>
                 <option value="low">🟢 Low</option>
               </select>
+            </div>
+            <div className="form-group">
+              <label>Webhook Callback URL (Optional)</label>
+              <input
+                className="form-input"
+                placeholder="https://webhook.site/..."
+                value={form.callbackUrl}
+                onChange={e => setForm({ ...form, callbackUrl: e.target.value })}
+              />
             </div>
 
           </div>

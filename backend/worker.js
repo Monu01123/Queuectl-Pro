@@ -48,7 +48,27 @@ const startWorker = async () => {
             await redisClient.hSet(`job:${jobId}`, { status: "completed" });
             console.log(`✅ Job ${jobId} completed successfully`);
 
-            // 2. RELEASE LOCK ON SUCCESS
+            // 2. DISPATCH OUTBOUND WEBHOOK NOTIFICATION (EVENT-DRIVEN ARCHITECTURE)
+            if (job.callbackUrl) {
+                try {
+                    console.log(`📡 [Webhook] Dispatching callback POST to ${job.callbackUrl}...`);
+                    await fetch(job.callbackUrl, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            jobId: jobId,
+                            command: job.command,
+                            status: "success",
+                            completedAt: new Date().toISOString()
+                        })
+                    });
+                    console.log(`✅ [Webhook Delivered] Sent completion payload to ${job.callbackUrl}`);
+                } catch (webhookErr) {
+                    console.error(`⚠️ [Webhook Failed] Could not deliver callback to client:`, webhookErr.message);
+                }
+            }
+
+            // 3. RELEASE LOCK ON SUCCESS
             await redisClient.del(lockKey);
 
         } catch (error) {
